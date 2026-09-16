@@ -1,19 +1,28 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useVehicleStore } from '../stores/vehicles'
 import StatusChip from './StatusChip.vue'
 
 const vehicleStore = useVehicleStore()
+const loading = ref(true)
+const loadError = ref('')
 
 const submissions = computed(() =>
   [...vehicleStore.vehicles].sort(
-    (a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)
+    (a, b) => new Date(b.created_at) - new Date(a.created_at)
   )
 )
 
 const selectedVehicle = ref(null)
 const showDetail = ref(false)
 const showDeleteConfirm = ref(false)
+
+const STORAGE_BASE = 'http://127.0.0.1:8000/storage/'
+
+function imageUrl(vehicle) {
+  const path = vehicle.images?.[0]?.image_path
+  return path ? STORAGE_BASE + path : null
+}
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-GB', {
@@ -25,8 +34,8 @@ function formatDate(dateStr) {
 
 function formatPrice(vehicle) {
   const fmt = (n) => `KES ${Number(n).toLocaleString()}`
-  if (vehicle.offerAmount) return fmt(vehicle.offerAmount)
-  return `${fmt(vehicle.desiredPriceMin)} – ${fmt(vehicle.desiredPriceMax)}`
+  if (vehicle.offer_amount) return fmt(vehicle.offer_amount)
+  return `${fmt(vehicle.desired_price_min)} – ${fmt(vehicle.desired_price_max)}`
 }
 
 function openDetail(vehicle) {
@@ -40,6 +49,15 @@ async function confirmDelete() {
   showDetail.value = false
   selectedVehicle.value = null
 }
+
+onMounted(async () => {
+  loading.value = true
+  const result = await vehicleStore.fetchMyVehicles()
+  if (!result.success) {
+    loadError.value = result.message
+  }
+  loading.value = false
+})
 </script>
 
 <template>
@@ -62,7 +80,15 @@ async function confirmDelete() {
       </v-btn>
     </div>
 
-    <v-row v-if="submissions.length">
+    <v-alert v-if="loadError" type="error" variant="tonal" class="mb-6">
+      {{ loadError }}
+    </v-alert>
+
+    <div v-if="loading" class="text-center py-10">
+      <v-progress-circular indeterminate color="primary"></v-progress-circular>
+    </div>
+
+    <v-row v-else-if="submissions.length">
       <v-col
         v-for="vehicle in submissions"
         :key="vehicle.id"
@@ -77,7 +103,7 @@ async function confirmDelete() {
           @click="openDetail(vehicle)"
         >
           <v-img
-            :src="vehicle.images?.[0]?.url"
+            :src="imageUrl(vehicle)"
             height="180"
             cover
           />
@@ -86,7 +112,7 @@ async function confirmDelete() {
               {{ vehicle.make }} {{ vehicle.model }}
             </div>
             <div class="text-body-2 text-medium-emphasis mb-3">
-              {{ vehicle.year }} · {{ vehicle.plateOrRef }}
+              {{ vehicle.year }} · {{ vehicle.registration_number }}
             </div>
 
             <div class="d-flex justify-space-between align-center mb-2">
@@ -97,7 +123,7 @@ async function confirmDelete() {
             </div>
 
             <div class="text-caption text-medium-emphasis">
-              Submitted {{ formatDate(vehicle.submittedAt) }}
+              Submitted {{ formatDate(vehicle.created_at) }}
             </div>
           </v-card-text>
         </v-card>
@@ -119,7 +145,7 @@ async function confirmDelete() {
     <v-dialog v-model="showDetail" max-width="480">
       <v-card v-if="selectedVehicle" rounded="lg" class="pa-2">
         <v-img
-          :src="selectedVehicle.images?.[0]?.url"
+          :src="imageUrl(selectedVehicle)"
           height="200"
           rounded="lg"
           cover
@@ -134,8 +160,8 @@ async function confirmDelete() {
           </div>
 
           <div class="text-body-2 text-medium-emphasis mb-3">
-            {{ selectedVehicle.year }} · {{ selectedVehicle.plateOrRef }} ·
-            Submitted {{ formatDate(selectedVehicle.submittedAt) }}
+            {{ selectedVehicle.year }} · {{ selectedVehicle.registration_number }} ·
+            Submitted {{ formatDate(selectedVehicle.created_at) }}
           </div>
 
           <p v-if="selectedVehicle.description" class="text-body-2 mb-3">
@@ -145,18 +171,18 @@ async function confirmDelete() {
           <div class="d-flex justify-space-between text-body-2 mb-1">
             <span class="text-medium-emphasis">Your desired range</span>
             <span class="font-weight-medium">
-              KES {{ Number(selectedVehicle.desiredPriceMin).toLocaleString() }} –
-              KES {{ Number(selectedVehicle.desiredPriceMax).toLocaleString() }}
+              KES {{ Number(selectedVehicle.desired_price_min).toLocaleString() }} –
+              KES {{ Number(selectedVehicle.desired_price_max).toLocaleString() }}
             </span>
           </div>
 
           <div
-            v-if="selectedVehicle.offerAmount"
+            v-if="selectedVehicle.offer_amount"
             class="d-flex justify-space-between text-body-2"
           >
             <span class="text-medium-emphasis">Company's offer</span>
             <span class="font-weight-bold text-primary">
-              KES {{ Number(selectedVehicle.offerAmount).toLocaleString() }}
+              KES {{ Number(selectedVehicle.offer_amount).toLocaleString() }}
             </span>
           </div>
         </v-card-text>

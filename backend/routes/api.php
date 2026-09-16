@@ -33,4 +33,5 @@ Route::middleware(['auth:sanctum', IsAdmin::class])->prefix('admin')->group(func
     Route::post('/vehicles/{id}/verify-transfer', [AdminVehicleController::class, 'verifyTransfer']);
     Route::post('/vehicles/{id}/complete', [AdminVehicleController::class, 'markCompleted']);
     Route::post('/vehicles/{id}/reject-transfer', [AdminVehicleController::class, 'rejectTransferDocument']);
+    Route::post('/vehicles/{id}/decline', [AdminVehicleController::class, 'declineVehicle']);
 });

@@ -64,17 +64,17 @@ class AdminVehicleController extends Controller
 
 
    public function transfersQueue(Request $request)
-    {
-       $vehicles = Vehicle::where('status', 'transfer_submitted')
-          ->with(['images', 'user'])
-          ->orderBy('created_at', 'asc')
-          ->get();
+   {
+    $vehicles = Vehicle::whereIn('status', ['transfer_submitted', 'transfer_verified'])
+        ->with(['images', 'user'])
+        ->orderBy('created_at', 'asc')
+        ->get();
 
-       return response()->json([
-         'success' => true,
-         'vehicles' => $vehicles,
-        ]);
-    }
+    return response()->json([
+        'success' => true,
+        'vehicles' => $vehicles,
+    ]);
+   }
 
 
     public function verifyTransfer(Request $request, $id)
@@ -174,8 +174,38 @@ class AdminVehicleController extends Controller
          'success' => true,
          'message' => 'Transfer document rejected',
          'vehicle' => $vehicle,
-     ]);
+    ]);    
+     
+  }
+
+//decline vehicle even beforan offer is made
+  public function declineVehicle(Request $request, $id)
+{
+    $vehicle = Vehicle::find($id);
+
+    if (! $vehicle) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Vehicle not found',
+        ], 404);
     }
+
+    if ($vehicle->status !== 'pending') {
+        return response()->json([
+            'success' => false,
+            'message' => 'This vehicle cannot be declined at its current stage',
+        ], 422);
+    }
+
+    $vehicle->status = 'rejected';
+    $vehicle->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Vehicle declined',
+        'vehicle' => $vehicle,
+    ]);
+}
 
     
 }

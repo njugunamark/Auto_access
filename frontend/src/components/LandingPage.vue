@@ -1,10 +1,17 @@
 <script setup>
 import { useRouter } from 'vue-router'
+import { useAuth } from '../services/Auth'
+
 const router = useRouter()
+const { isAuthenticated, isAdmin } = useAuth()
 
 function getStarted() {
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true'
-  router.push(isAuthenticated ? '/submit-vehicle' : '/login')
+  if (isAdmin.value) return // admins don't get an offer
+  if (isAuthenticated.value) {
+    router.push('/SubmitVehicle')
+  } else {
+    router.push('/Signup')
+  }
 }
 
 const stats = [
@@ -19,7 +26,14 @@ const whyChooseUs = [
   { icon: 'mdi-shield-check-outline', title: 'No Obligation', text: 'Accept, reject or counter. Nothing moves until you say yes.' },
 ]
 
-const partners = ['NTSA Agents Ltd', 'Kenlite Insurance', 'Mombasa Salvage', 'Rift Valley Auto', 'Jubilee Motors', 'Sarit Auto']
+const partners = [
+  { name: 'NTSA Agents Ltd', logo: '/trustees/ntsa.png' },
+  { name: 'Kenlite Insurance', logo: '/trustees/kenlite.png' },
+  { name: 'Mombasa Salvage', logo: '/trustees/wrecked.png' },
+  { name: 'Rift Valley Auto', logo: '/trustees/rift valley.png' },
+  { name: 'Jubilee Motors', logo: '/trustees/jubillee.png' },
+  { name: 'Sarit Auto', logo: '/trustees/sarit.png' },
+]
 
 const howItWorks = [
   { step: 1, icon: 'mdi-upload', title: 'Upload Photos', text: 'Snap your car from every angle and add condition notes and your price range.' },
@@ -53,19 +67,26 @@ const faqs = [
             <h1 class="text-h2 font-weight-bold mb-4" style="line-height: 1.1; color: #0F1B2D;">
               Turn Your Old Car Into Cash
             </h1>
-            <p class="text-body-1 text-medium-emphasis mb-6" style="max-width: 480px;">
-              Upload a few photos of your old, unused or knocked-out car and get a fair cash valuation from our assessment team — no dealership visits, no haggling on the roadside.
+            <p class="text-body-1 text-medium-emphasis mb-5" style="max-width: 480px;">
+              Upload a few photos of your old, unused or knocked-out car and get a fair cash valuation from our assessment team , No dealership visits, no haggling on the roadside.
             </p>
-            <v-btn color="primary" size="large" rounded="lg" class="text-none px-6" @click="getStarted">
+            <v-btn
+              v-if="!isAdmin"
+              color="primary"
+              size="large"
+              rounded="lg"
+              class="text-none px-6"
+              @click="getStarted"
+            >
               Get an Offer Now
             </v-btn>
           </v-col>
           <v-col cols="12" md="6">
             <v-img
-              src="https://images.unsplash.com/photo-1494905998402-395d579af36f?w=800"
+              src="beetle.jpg"
               rounded="lg"
               cover
-              height="380"
+              height="420"
             ></v-img>
           </v-col>
         </v-row>
@@ -77,7 +98,7 @@ const faqs = [
       <v-row class="text-center py-10">
         <v-col v-for="(stat, i) in stats" :key="i" cols="12" sm="4" :class="i < 2 ? 'border-e' : ''">
           <div class="text-h4 font-weight-bold text-primary">{{ stat.value }}</div>
-          <div class="text-body-2 text-medium-emphasis">{{ stat.label }}</div>
+          <div class="text-body-2 text-maximum-emphasis">{{ stat.label }}</div>
         </v-col>
       </v-row>
     </v-container>
@@ -87,8 +108,8 @@ const faqs = [
       <h2 class="text-h4 font-weight-bold text-center mb-10">Why Choose Us</h2>
       <v-row>
         <v-col v-for="(item, i) in whyChooseUs" :key="i" cols="12" md="4">
-          <v-card variant="outlined" rounded="lg" class="pa-6 h-100">
-            <v-avatar color="blue-lighten-5" size="48" class="mb-4">
+          <v-card rounded="lg" class="pa-6 h-100 border border-grey-lighten-5"  hover>
+            <v-avatar color="blue-lighten-4" size="48" class="mb-4">
               <v-icon :icon="item.icon" color="primary"></v-icon>
             </v-avatar>
             <div class="text-h6 font-weight-bold mb-2">{{ item.title }}</div>
@@ -98,25 +119,25 @@ const faqs = [
       </v-row>
     </v-container>
 
-    <!-- Trusted By -->
-    <v-container fluid class="py-10 bg-grey-lighten-5">
-      <h3 class="text-overline text-center text-medium-emphasis mb-6">Trusted By</h3>
-      <div class="partner-wrapper">
-        <div class="partner-track">
-          <div v-for="(partner, i) in [...partners, ...partners]" :key="i" class="partner-item">
-            <v-avatar color="grey-lighten-2" size="56" class="mb-2"></v-avatar>
-            <div class="text-caption text-medium-emphasis">{{ partner }}</div>
-          </div>
-        </div>
+   <!-- Trusted By -->
+<v-container fluid class="py-10 bg-grey-lighten-3 mt-10 mb-10">
+  <h3 class="text-overline text-center text-maximum-emphasis mb-6">Trusted By</h3>
+  <div class="partner-wrapper ">
+    <div class="partner-track">
+      <div v-for="(partner, i) in [...partners, ...partners,...partners]" :key="i" class="partner-item">
+        <v-avatar :image="partner.logo" size="56" class="mb-5"></v-avatar>
+        <div class="text-caption text-maximum-emphasis">{{ partner.name }}</div>
       </div>
-    </v-container>
+    </div>
+  </div>
+</v-container>
 
     <!-- How It Works -->
     <v-container class="py-10">
       <h2 class="text-h4 font-weight-bold text-center mb-10">How It Works</h2>
       <v-row>
         <v-col v-for="item in howItWorks" :key="item.step" cols="12" md="4">
-          <v-card variant="outlined" rounded="lg" class="pa-6 h-100">
+          <v-card  rounded="lg" class="pa-6 h-100">
             <div class="d-flex align-center mb-4">
               <v-avatar color="primary" size="32" class="mr-2">
                 <span class="text-white text-body-2 font-weight-bold">{{ item.step }}</span>
@@ -124,31 +145,33 @@ const faqs = [
               <v-icon :icon="item.icon" color="primary"></v-icon>
             </div>
             <div class="text-h6 font-weight-bold mb-2">{{ item.title }}</div>
-            <div class="text-body-2 text-medium-emphasis">{{ item.text }}</div>
+            <div class="text-body-2 text-maximum-emphasis">{{ item.text }}</div>
           </v-card>
         </v-col>
       </v-row>
     </v-container>
 
-    <!-- Reviews -->
-    <v-container class="py-10">
-      <h2 class="text-h4 font-weight-bold text-center mb-10">What Sellers Say</h2>
-      <v-row>
-        <v-col v-for="(review, i) in reviews" :key="i" cols="12" md="4">
-          <v-card variant="outlined" rounded="lg" class="pa-6 h-100">
-            <v-rating :model-value="review.rating" readonly color="amber" density="compact" size="small"></v-rating>
-            <p class="text-body-2 my-4" style="min-height: 72px;">"{{ review.text }}"</p>
-            <div class="text-body-2 font-weight-medium">{{ review.name }}</div>
-          </v-card>
-        </v-col>
-      </v-row>
-    </v-container>
+  <!-- Reviews -->
+<v-container fluid class="py-10 bg-primary" height="600px">
+  <v-container>
+    <h2 class="text-h4 font-weight-bold text-center mb-10 text-white">What Sellers Say</h2>
+    <v-row>
+      <v-col v-for="(review, i) in reviews" :key="i" cols="12" md="4">
+        <v-card rounded="lg" class="pa-6 h-100"height="250px" style="background: rgba(255,255,255,0.4);">
+          <v-rating :model-value="review.rating" readonly color="amber" density="compact" size="small"></v-rating>
+          <p class="text-body-2 my-4" style="min-height: 72px;">"{{ review.text }}"</p>
+          <div class="text-body-2 font-weight-medium">{{ review.name }}</div>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
+</v-container>
 
     <!-- FAQ -->
     <v-container class="py-10" style="max-width: 800px;">
       <h2 class="text-h4 font-weight-bold text-center mb-10">Frequently Asked Questions</h2>
       <v-expansion-panels variant="accordion">
-        <v-expansion-panel v-for="(faq, i) in faqs" :key="i" :title="faq.q" :text="faq.a"></v-expansion-panel>
+        <v-expansion-panel v-for="(faq, i) in faqs" :key="i" :title="faq.q" :text="faq.a" :text-bold="faq.a"></v-expansion-panel>
       </v-expansion-panels>
     </v-container>
 
@@ -158,7 +181,14 @@ const faqs = [
       <p class="text-body-1 mb-6" style="color: rgba(255,255,255,0.85);">
         One submission, one valuation, one payout. No listings, no buyers to chase.
       </p>
-      <v-btn color="white" size="large" rounded="lg" class="text-none px-8" @click="getStarted">
+      <v-btn
+        v-if="!isAdmin"
+        color="white"
+        size="large"
+        rounded="lg"
+        class="text-none px-8"
+        @click="getStarted"
+      >
         Get Started
       </v-btn>
     </v-container>

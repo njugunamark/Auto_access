@@ -1,67 +1,79 @@
 import { ref } from 'vue'
+import api from './api'
 
-const isAuthenticated = ref(localStorage.getItem('isAuthenticated') === 'true')
-const isAdmin = ref(localStorage.getItem('isAdmin') === 'true')
-
-// Mock "allowlist" — a real backend would check this against a database
-const ADMIN_EMAILS = ['admin@autoaccess.com', 'reviewer@autoaccess.com']
-
-function resolveRole(email) {
-  return ADMIN_EMAILS.includes(email.toLowerCase()) ? 'admin' : 'seller'
-}
+const isAuthenticated = ref(!!localStorage.getItem('token'))
+const isAdmin = ref(localStorage.getItem('role') === 'admin')
 
 export function useAuth() {
 
-  async function checkCredentials(credentials) {
-    try {
-      if (!credentials.email || !credentials.password) {
-        throw new Error('Email and password are required')
-      }
-
-      const stored = localStorage.getItem('user')
-      if (!stored) throw new Error('No user found')
-
-      const user = JSON.parse(stored)
-
-      if (user.email !== credentials.email || user.password !== credentials.password) {
-        throw new Error('Invalid email or password')
-      }
-
-      isAuthenticated.value = true
-      isAdmin.value = resolveRole(user.email) === 'admin'
-
-      localStorage.setItem('isAuthenticated', isAuthenticated.value)
-      localStorage.setItem('isAdmin', isAdmin.value)
-
-      return { success: true }
-    } catch (err) {
-      return { success: false, message: err.message }
-    }
-  }
-
   async function signup(data) {
     try {
-      const role = resolveRole(data.email)
-      const user = { ...data, role }
+      const response = await api.post('/register', {
+        name: data.fullName,
+        email: data.email,
+        password: data.password,
+        password_confirmation: data.password,
+        phone_number: data.phoneNumber,
+        location: data.location,
+        address: data.address,
+      })
+
+      const { user, token } = response.data
+
+      localStorage.setItem('token', token)
+      localStorage.setItem('role', user.role)
+      localStorage.setItem('user', JSON.stringify(user))
 
       isAuthenticated.value = true
-      isAdmin.value = role === 'admin'
-
-      localStorage.setItem('isAuthenticated', isAuthenticated.value)
-      localStorage.setItem('isAdmin', isAdmin.value)
-      localStorage.setItem('user', JSON.stringify(user))
+      isAdmin.value = user.role === 'admin'
 
       return { success: true }
     } catch (err) {
-      return { success: false, message: 'Error signing up' }
+      return {
+        success: false,
+        message: err.response?.data?.message || 'Something went wrong. Please try again.',
+      }
     }
   }
 
-  function logout() {
+  async function checkCredentials(credentials) {
+    try {
+      const response = await api.post('/login', {
+        email: credentials.email,
+        password: credentials.password,
+      })
+
+      const { user, token } = response.data
+
+      localStorage.setItem('token', token)
+      localStorage.setItem('role', user.role)
+      localStorage.setItem('user', JSON.stringify(user))
+
+      isAuthenticated.value = true
+      isAdmin.value = user.role === 'admin'
+
+      return { success: true }
+    } catch (err) {
+      return {
+        success: false,
+        message: err.response?.data?.message || 'Invalid email or password.',
+      }
+    }
+  }
+
+  async function logout() {
+    try {
+      await api.post('/logout')
+    } catch (err) {
+      // even if the request fails, still clear local state
+    }
+
+    localStorage.removeItem('token')
+    localStorage.removeItem('role')
+    localStorage.removeItem('user')
+
     isAuthenticated.value = false
     isAdmin.value = false
-    localStorage.removeItem('isAuthenticated')
-    localStorage.removeItem('isAdmin')
   }
 
   return { isAuthenticated, isAdmin, checkCredentials, signup, logout }

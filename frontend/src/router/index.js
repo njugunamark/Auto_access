@@ -54,9 +54,8 @@ const router = createRouter({
      component: SubmitVehicle
   },
     {
-    path: `/VehicleDetail`,
-     component: VehicleDetail
-
+  path: `/VehicleDetail/:id`,
+  component: VehicleDetail
   },
     {
     path: `/VehicleCard`,

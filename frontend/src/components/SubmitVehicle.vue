@@ -37,6 +37,7 @@ const logbookInput = ref(null)
 const loading = ref(false)
 const errorMessage = ref('')
 const showSuccess = ref(false)
+const showError = ref(false)
 
 const years = Array.from({ length: 35 }, (_, i) => `${2026 - i}`)
 
@@ -86,6 +87,7 @@ async function openCamera() {
     if (videoRef.value) videoRef.value.srcObject = mediaStream
   } catch (err) {
     errorMessage.value = 'Could not access camera. Please check permissions.'
+    showError.value = true
   }
 }
 
@@ -133,31 +135,30 @@ async function handleSubmit() {
 
   if (photos.value.length < 4) {
     errorMessage.value = 'Please upload at least four photos.'
+    showError.value = true
     return
   }
 
   if (!logbookFile.value) {
     errorMessage.value = 'Please upload a logbook photo for ownership verification.'
+    showError.value = true
     return
   }
 
   loading.value = true
 
-  const currentUser = JSON.parse(localStorage.getItem('user') || 'null')
-
   const result = await vehicleStore.submitVehicle({
     make: make.value,
     model: model.value,
     year: year.value,
-    plateOrRef: registrationNumber.value,
+    registrationNumber: registrationNumber.value,
     conditionNotes: conditionNotes.value,
     description: description.value,
     desiredPriceMin: Number(minPrice.value),
     desiredPriceMax: Number(maxPrice.value),
-    images: photos.value.map(p => ({ url: p.previewUrl })),
     nationalId: nationalId.value,
-    sellerName: currentUser?.name,
-    sellerEmail: currentUser?.email,
+    logbookFile: logbookFile.value,
+    photos: photos.value.map(p => p.file),
   })
 
   loading.value = false
@@ -169,6 +170,7 @@ async function handleSubmit() {
     }, 1800)
   } else {
     errorMessage.value = result.message || 'Something went wrong. Please try again.'
+    showError.value = true
   }
 }
 
@@ -186,10 +188,6 @@ function saveDraft() {
       <p class="text-body-1 text-medium-emphasis mb-8">
         Tell us about the car and upload clear photos. Our team reviews every submission within 24 hours.
       </p>
-
-      <v-alert v-if="errorMessage" type="error" variant="tonal" rounded="lg" class="mb-6">
-        {{ errorMessage }}
-      </v-alert>
 
       <v-row>
         <!-- Main column -->
@@ -371,6 +369,19 @@ function saveDraft() {
       <div class="d-flex align-center" style="gap: 8px">
         <v-icon icon="mdi-check-circle" />
         <span>Submitted successfully! Please wait for review by our team.</span>
+      </div>
+    </v-snackbar>
+
+    <!-- Error notification -->
+    <v-snackbar
+      v-model="showError"
+      color="error"
+      location="top"
+      :timeout="4000"
+    >
+      <div class="d-flex align-center" style="gap: 8px">
+        <v-icon icon="mdi-alert-circle" />
+        <span>{{ errorMessage }}</span>
       </div>
     </v-snackbar>
   </v-container>

@@ -19,20 +19,19 @@ const initials = computed(() => {
 })
 
 const maskedPhone = computed(() => {
-  const phone = user.value?.phone
+  const phone = user.value?.phone_number
   if (!phone) return null
   return phone.replace(/(\+\d{3}\s?\d{1})\d+(\d{3})$/, '$1●●●●●●$2')
 })
 
 const memberSince = computed(() => {
-  if (!user.value?.joinedAt) return ''
-  return new Date(user.value.joinedAt).toLocaleDateString('en-US', {
+  if (!user.value?.created_at) return ''
+  return new Date(user.value.created_at).toLocaleDateString('en-US', {
     month: 'long',
     year: 'numeric',
   })
 })
 
-// --- Profile picture upload ---
 const fileInput = ref(null)
 
 function triggerFileSelect() {
@@ -42,10 +41,8 @@ function triggerFileSelect() {
 function onPhotoSelected(event) {
   const file = event.target.files[0]
   if (!file) return
-
   const reader = new FileReader()
   reader.onload = () => {
-    // Save as a base64 data URL so it survives a page refresh via localStorage
     user.value.photoUrl = reader.result
     localStorage.setItem('user', JSON.stringify(user.value))
   }
@@ -61,9 +58,7 @@ function logOut() {
 <template>
   <v-container class="py-8" style="max-width: 900px">
     <h1 class="text-h4 font-weight-bold mb-1">Profile</h1>
-    <p class="text-body-2 text-medium-emphasis mb-6">
-      Your account details and role permissions.
-    </p>
+      <h3 class="text-body-2 text-maximum-emphasis  mb-6">Welcome, {{ user.name }}!</h3>
 
     <template v-if="user">
       <v-row>
@@ -128,6 +123,24 @@ function logOut() {
             >
               <span class="text-body-2 text-medium-emphasis">Phone</span>
               <span class="text-body-2 font-weight-medium">{{ maskedPhone }}</span>
+            </div>
+
+            <div
+              v-if="user.location"
+              class="d-flex justify-space-between align-center py-3"
+              style="border-bottom: 1px solid #eee"
+            >
+              <span class="text-body-2 text-medium-emphasis">Location</span>
+              <span class="text-body-2 font-weight-medium">{{ user.location }}</span>
+            </div>
+
+            <div
+              v-if="user.address"
+              class="d-flex justify-space-between align-center py-3"
+              style="border-bottom: 1px solid #eee"
+            >
+              <span class="text-body-2 text-medium-emphasis">Address</span>
+              <span class="text-body-2 font-weight-medium">{{ user.address }}</span>
             </div>
 
             <div class="d-flex mt-4" style="gap: 12px">

@@ -53,8 +53,6 @@ async function handleSignup() {
   loading.value = true
 
   const result = await signup({
-    firstname: firstName.value,
-    lastname: lastName.value,
     fullName: `${firstName.value} ${lastName.value}`,
     email: email.value,
     phoneNumber: phoneNumber.value,

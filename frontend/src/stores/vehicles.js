@@ -1,100 +1,195 @@
 import { defineStore } from 'pinia'
+import api from '../services/api'
 
 export const useVehicleStore = defineStore('vehicles', {
   state: () => ({
-    vehicles: [], // starts empty — fills up as you submit vehicles
+    vehicles: [],       // seller's own vehicles (My Submissions)
+    pendingVehicles: [], // admin's review queue
+    transferVehicles: [], // admin's transfers queue
   }),
 
   getters: {
     getVehicleById: (state) => (id) =>
-      state.vehicles.find((v) => v.id === id),
+      state.vehicles.find((v) => v.id === Number(id)) ||
+      state.pendingVehicles.find((v) => v.id === Number(id)) ||
+      state.transferVehicles.find((v) => v.id === Number(id)),
   },
 
   actions: {
-    async submitVehicle(vehicleData) {
-      const newVehicle = {
-        id: `AA-${1000 + this.vehicles.length + 1}`,
-        status: 'pending',
-        submittedAt: new Date().toISOString().slice(0, 10),
-        offerAmount: null,
-        ...vehicleData, // make, model, year, images, desiredPriceMin/Max, description
+    // ----- Seller actions -----
+
+    async fetchMyVehicles() {
+      try {
+        const response = await api.get('/vehicles')
+        this.vehicles = response.data.vehicles
+        return { success: true }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to load vehicles' }
       }
-      this.vehicles.unshift(newVehicle)
-      return { success: true, vehicle: newVehicle }
     },
 
-    async makeOffer(vehicleId, amount) {
-      const vehicle = this.getVehicleById(vehicleId)
-      if (!vehicle) return { success: false, message: 'Vehicle not found' }
-      vehicle.offerAmount = amount
-      vehicle.status = 'offer_made'
-      return { success: true }
+    async fetchVehicle(id) {
+      try {
+        const response = await api.get(`/vehicles/${id}`)
+        return { success: true, vehicle: response.data.vehicle }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Vehicle not found' }
+      }
+    },
+
+    async submitVehicle(vehicleData) {
+      try {
+        const formData = new FormData()
+
+        formData.append('make', vehicleData.make)
+        formData.append('model', vehicleData.model)
+        formData.append('year', vehicleData.year)
+        formData.append('registration_number', vehicleData.registrationNumber)
+        formData.append('condition_notes', vehicleData.conditionNotes || '')
+        formData.append('description', vehicleData.description || '')
+        formData.append('desired_price_min', vehicleData.desiredPriceMin)
+        formData.append('desired_price_max', vehicleData.desiredPriceMax)
+        formData.append('national_id', vehicleData.nationalId)
+        formData.append('logbook', vehicleData.logbookFile)
+
+        vehicleData.photos.forEach((photo) => {
+          formData.append('photos[]', photo)
+        })
+
+        const response = await api.post('/vehicles', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+
+        this.vehicles.unshift(response.data.vehicle)
+        return { success: true, vehicle: response.data.vehicle }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Submission failed' }
+      }
     },
 
     async acceptOffer(vehicleId) {
-      const vehicle = this.getVehicleById(vehicleId)
-      if (!vehicle) return { success: false, message: 'Vehicle not found' }
-      vehicle.status = 'accepted'
-      return { success: true }
+      try {
+        const response = await api.post(`/vehicles/${vehicleId}/accept`)
+        this._updateLocalVehicle(response.data.vehicle)
+        return { success: true }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to accept offer' }
+      }
     },
 
     async rejectOffer(vehicleId) {
-      const vehicle = this.getVehicleById(vehicleId)
-      if (!vehicle) return { success: false, message: 'Vehicle not found' }
-      vehicle.status = 'rejected'
-      return { success: true }
+      try {
+        const response = await api.post(`/vehicles/${vehicleId}/reject`)
+        this._updateLocalVehicle(response.data.vehicle)
+        return { success: true }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to reject offer' }
+      }
+    },
+
+    async submitTransferProof(vehicleId, { sellerName, sellerEmail, file }) {
+      try {
+        const formData = new FormData()
+        formData.append('seller_name', sellerName)
+        formData.append('seller_email', sellerEmail)
+        formData.append('proof', file)
+
+        const response = await api.post(`/vehicles/${vehicleId}/transfer-proof`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        this._updateLocalVehicle(response.data.vehicle)
+        return { success: true }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to submit proof' }
+      }
     },
 
     async deleteVehicle(vehicleId) {
-      const index = this.vehicles.findIndex(v => v.id === vehicleId)
-      if (index === -1) return { success: false, message: 'Vehicle not found' }
-      this.vehicles.splice(index, 1)
-      return { success: true }
+      try {
+        await api.delete(`/vehicles/${vehicleId}`)
+        this.vehicles = this.vehicles.filter((v) => v.id !== vehicleId)
+        return { success: true }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to delete vehicle' }
+      }
     },
 
-        async submitTransferProof(vehicleId, { sellerName, sellerEmail, file }) {
-      const vehicle = this.getVehicleById(vehicleId)
-      if (!vehicle) return { success: false, message: 'Vehicle not found' }
+    // ----- Admin actions -----
 
-      vehicle.transferProof = {
-        sellerName,
-        sellerEmail,
-        fileName: file?.name || null,
-        fileUrl: file ? URL.createObjectURL(file) : null,
-        submittedAt: new Date().toISOString(),
+    async fetchPendingVehicles() {
+      try {
+        const response = await api.get('/admin/vehicles/pending')
+        this.pendingVehicles = response.data.vehicles
+        return { success: true }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to load pending vehicles' }
       }
-      vehicle.status = 'transfer_submitted'
-      return { success: true }
+    },
+
+    async makeOffer(vehicleId, amount) {
+      try {
+        const response = await api.post(`/admin/vehicles/${vehicleId}/offer`, { offer_amount: amount })
+        this.pendingVehicles = this.pendingVehicles.filter((v) => v.id !== vehicleId)
+        return { success: true, vehicle: response.data.vehicle }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to send offer' }
+      }
+    },
+
+    async declineVehicle(vehicleId) {
+      try {
+        const response = await api.post(`/admin/vehicles/${vehicleId}/decline`)
+        this.pendingVehicles = this.pendingVehicles.filter((v) => v.id !== vehicleId)
+        return { success: true, vehicle: response.data.vehicle }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to decline vehicle' }
+      }
+    },
+
+    async fetchTransfersQueue() {
+      try {
+        const response = await api.get('/admin/vehicles/transfers')
+        this.transferVehicles = response.data.vehicles
+        return { success: true }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to load transfers' }
+      }
     },
 
     async verifyTransfer(vehicleId) {
-      const vehicle = this.getVehicleById(vehicleId)
-      if (!vehicle) return { success: false, message: 'Vehicle not found' }
-
-      vehicle.transferVerifiedAt = new Date().toISOString()
-      vehicle.status = 'transfer_verified'
-      return { success: true }
+      try {
+        const response = await api.post(`/admin/vehicles/${vehicleId}/verify-transfer`)
+        this._updateLocalVehicle(response.data.vehicle, 'transferVehicles')
+        return { success: true }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to verify transfer' }
+      }
     },
 
     async markCompleted(vehicleId) {
-      const vehicle = this.getVehicleById(vehicleId)
-      if (!vehicle) return { success: false, message: 'Vehicle not found' }
-
-      vehicle.completedAt = new Date().toISOString()
-      vehicle.status = 'completed'
-      return { success: true }
+      try {
+        const response = await api.post(`/admin/vehicles/${vehicleId}/complete`)
+        this.transferVehicles = this.transferVehicles.filter((v) => v.id !== vehicleId)
+        return { success: true, vehicle: response.data.vehicle }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to mark completed' }
+      }
     },
 
-    async rejectTransferDocument(vehicleId, reason = '') {
-      const vehicle = this.getVehicleById(vehicleId)
-      if (!vehicle) return { success: false, message: 'Vehicle not found' }
-
-      vehicle.transferProof = null
-      vehicle.transferRejectionReason = reason
-      vehicle.status = 'accepted' // bounce back so seller can re-upload
-      return { success: true }
+    async rejectTransferDocument(vehicleId, reason) {
+      try {
+        const response = await api.post(`/admin/vehicles/${vehicleId}/reject-transfer`, { reason })
+        this.transferVehicles = this.transferVehicles.filter((v) => v.id !== vehicleId)
+        return { success: true, vehicle: response.data.vehicle }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || 'Failed to reject document' }
+      }
     },
 
-    
+    // ----- Internal helper -----
+    _updateLocalVehicle(updatedVehicle, listName = 'vehicles') {
+      const index = this[listName].findIndex((v) => v.id === updatedVehicle.id)
+      if (index !== -1) this[listName][index] = updatedVehicle
+    },
   },
 })
